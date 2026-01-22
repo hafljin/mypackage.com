@@ -11,9 +11,11 @@ import {
   Mail,
   Smartphone,
   ClipboardList,
-  UserCheck
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
-import { analyzeInquiry } from './services/geminiService';
+import { analyzeInquiry, validateInquiry } from './services/geminiService';
+import { AIDiagnosticResponse } from './types';
 
 // --- Sub-components ---
 
@@ -61,8 +63,9 @@ const CTAButton = ({
 
 export default function App() {
   const [inquiryText, setInquiryText] = useState("");
-  const [analysis, setAnalysis] = useState("");
+  const [diagnosticResult, setDiagnosticResult] = useState<AIDiagnosticResponse | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [checkedItems, setCheckedItems] = useState<number[]>([]);
 
   const toggleCheck = (idx: number) => {
@@ -72,11 +75,31 @@ export default function App() {
   };
 
   const handleAnalyze = async () => {
-    if (!inquiryText.trim()) return;
+    if (!inquiryText.trim()) {
+      setValidationError("問い合わせ内容を入力してください。");
+      return;
+    }
+    
+    // バリデーション
+    const validation = validateInquiry(inquiryText);
+    if (!validation.isValid) {
+      setValidationError(validation.errorMessage || "入力内容が不正です。");
+      setDiagnosticResult(null);
+      return;
+    }
+    
+    setValidationError(null);
     setIsAnalyzing(true);
-    const result = await analyzeInquiry(inquiryText);
-    setAnalysis(result);
-    setIsAnalyzing(false);
+    
+    try {
+      const result = await analyzeInquiry(inquiryText);
+      setDiagnosticResult(result);
+    } catch (error) {
+      setValidationError(error instanceof Error ? error.message : "分析中にエラーが発生しました。");
+      setDiagnosticResult(null);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -231,31 +254,122 @@ export default function App() {
       {/* AI Diagnostic (Bonus Feature) */}
       <Section className="bg-indigo-900 text-white">
         <div className="max-w-3xl mx-auto">
-          <Heading className="text-white">【AI診断】今の対応を分析してみる</Heading>
+          <Heading className="text-white">【自動診断】今の対応を分析してみる</Heading>
           <p className="text-center mb-8 text-indigo-100">
             実際にお客様に送っている返信や、よく来る問い合わせを入力してください。<br />
-            自動化のプロが（AIの力を借りて）無料でアドバイスします。
+            自動化のプロが無料でアドバイスします。
           </p>
           <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20">
             <textarea 
               value={inquiryText}
-              onChange={(e) => setInquiryText(e.target.value)}
+              onChange={(e) => {
+                setInquiryText(e.target.value);
+                setValidationError(null); // 入力時にエラーをクリア
+              }}
               placeholder="例：『送料はいくらですか？』『予約のキャンセルはできますか？』などのよくある質問を入力..."
-              className="w-full h-32 p-4 rounded-xl bg-white text-slate-900 mb-4 focus:ring-2 focus:ring-blue-400 outline-none"
+              className={`w-full h-32 p-4 rounded-xl bg-white text-slate-900 mb-4 focus:ring-2 focus:ring-blue-400 outline-none ${
+                validationError ? 'border-2 border-red-400' : ''
+              }`}
             />
+            {validationError && (
+              <div className="mb-4 p-4 bg-red-500/20 border border-red-400/50 rounded-xl">
+                <p className="text-red-200 text-sm whitespace-pre-line">{validationError}</p>
+              </div>
+            )}
             <button 
               onClick={handleAnalyze}
-              disabled={isAnalyzing || !inquiryText}
+              disabled={isAnalyzing || !inquiryText.trim()}
               className="w-full py-4 bg-white text-indigo-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50"
             >
               {isAnalyzing ? "分析中..." : "無料で自動化アドバイスを受ける"}
             </button>
-            {analysis && (
-              <div className="mt-6 p-6 bg-white/5 border border-white/10 rounded-2xl animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <h5 className="font-bold text-blue-300 mb-2 flex items-center gap-2">
-                  <Zap className="w-4 h-4" /> 分析結果アドバイス:
-                </h5>
-                <div className="text-indigo-50 leading-relaxed whitespace-pre-wrap">{analysis}</div>
+            {diagnosticResult && (
+              <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                {/* AI風のメッセージ */}
+                <div className="p-6 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/20 rounded-2xl backdrop-blur-sm">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-10 h-10 bg-blue-400/30 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-5 h-5 text-blue-200" />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-bold text-blue-200 mb-2">診断結果</h5>
+                      <p className="text-indigo-50 leading-relaxed">{diagnosticResult.aiMessage}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 分析結果の詳細 */}
+                {diagnosticResult.analysis && (
+                  <div className="p-6 bg-white/5 border border-white/10 rounded-2xl">
+                    <h5 className="font-bold text-blue-300 mb-3 flex items-center gap-2">
+                      <Zap className="w-4 h-4" /> 詳細分析
+                    </h5>
+                    <div className="text-indigo-50 leading-relaxed whitespace-pre-wrap">{diagnosticResult.analysis}</div>
+                  </div>
+                )}
+
+                {/* 提携パターンの提案 */}
+                {diagnosticResult.patterns && diagnosticResult.patterns.length > 0 && (
+                  <div className="space-y-4">
+                    <h5 className="font-bold text-blue-300 text-lg flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5" /> おすすめの提携パターン
+                    </h5>
+                    <div className="grid gap-4">
+                      {diagnosticResult.patterns.map((pattern, idx) => (
+                        <div 
+                          key={pattern.id}
+                          className={`p-6 rounded-2xl border-2 transition-all ${
+                            idx === 0 
+                              ? 'bg-blue-500/20 border-blue-400/50 shadow-lg shadow-blue-500/20' 
+                              : 'bg-white/5 border-white/10'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h6 className="font-bold text-lg text-white">{pattern.name}</h6>
+                                {idx === 0 && (
+                                  <span className="px-2 py-1 bg-blue-400 text-blue-900 text-xs font-bold rounded-full">
+                                    最適
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-indigo-100 text-sm mb-3">{pattern.description}</p>
+                              {pattern.suitability > 0 && (
+                                <div className="mb-3">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs text-indigo-200">適合度</span>
+                                    <span className="text-sm font-bold text-blue-300">{pattern.suitability}%</span>
+                                  </div>
+                                  <div className="w-full bg-white/10 rounded-full h-2">
+                                    <div 
+                                      className="bg-blue-400 h-2 rounded-full transition-all duration-500"
+                                      style={{ width: `${pattern.suitability}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            {pattern.priceRange && (
+                              <div className="text-right ml-4">
+                                <div className="text-xs text-indigo-200 mb-1">価格目安</div>
+                                <div className="text-lg font-bold text-blue-300">{pattern.priceRange}</div>
+                              </div>
+                            )}
+                          </div>
+                          <ul className="space-y-2 mt-4">
+                            {pattern.features.map((feature, featureIdx) => (
+                              <li key={featureIdx} className="flex items-start gap-2 text-sm text-indigo-100">
+                                <CheckCircle2 className="w-4 h-4 text-blue-300 flex-shrink-0 mt-0.5" />
+                                <span>{feature}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
