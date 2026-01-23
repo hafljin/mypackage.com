@@ -70,6 +70,8 @@ const INQUIRY_KEYWORDS = [
   'サービス', '商品', '商品について', '商品は',
   '使い方', '使用方法', '使い方は', '方法',
   '期限', '期間', 'いつまで', '期限は',
+  '納品', '納期', 'いつ届く', '届く', '発送', 'お届け',
+  '見積もり', '見積', 'お見積', '見積書', '金額', '見積金額',
   '条件', '要件', '必要', '必要です',
   // その他
   'お願い', 'お願いします', 'よろしく', 'お願いいたします',
@@ -94,7 +96,7 @@ export const validateInquiry = (text: string): ValidationResult => {
   if (trimmedText.length < 20) {
     return {
       isValid: false,
-      errorMessage: "問い合わせ内容は20文字以上で入力してください。\n例：「送料はいくらですか？」「予約のキャンセルはできますか？」など"
+      errorMessage: "問い合わせ内容は20文字以上で入力してください。\n例：「送料はいくらですか？」「どのくらいで納品になりますか？」「見積もり金額はいくらですか？」など"
     };
   }
   
@@ -103,7 +105,7 @@ export const validateInquiry = (text: string): ValidationResult => {
     if (pattern.test(trimmedText)) {
       return {
         isValid: false,
-        errorMessage: "問い合わせ内容を具体的に入力してください。\n例：「送料はいくらですか？」「予約のキャンセルはできますか？」など"
+        errorMessage: "問い合わせ内容を具体的に入力してください。\n例：「送料はいくらですか？」「どのくらいで納品になりますか？」「見積もり金額はいくらですか？」など"
       };
     }
   }
@@ -116,7 +118,7 @@ export const validateInquiry = (text: string): ValidationResult => {
   if (!hasInquiryKeyword && trimmedText.length < 50) {
     return {
       isValid: false,
-      errorMessage: "問い合わせ内容をより具体的に入力してください。\n例：「送料はいくらですか？」「予約のキャンセルはできますか？」など"
+      errorMessage: "問い合わせ内容をより具体的に入力してください。\n例：「送料はいくらですか？」「どのくらいで納品になりますか？」「見積もり金額はいくらですか？」など"
     };
   }
   
@@ -207,6 +209,18 @@ const DIAGNOSTIC_TEMPLATES: Array<{
     message: "分析が完了しました！期限に関する問い合わせは、自動返信で正確な情報を提供できます。基本自動化パックで十分に対応できます。",
     analysis: "期限に関する問い合わせは、固定情報のため自動返信に最適です。24時間いつでも正確な情報を提供できるため、顧客の不安を解消できます。",
     patterns: ['basic', 'standard']
+  },
+  {
+    keywords: ['納品', '納期', 'いつ届く', '届く', '発送', 'お届け', 'どのくらいで'],
+    message: "分析が完了しました！納品・納期に関する問い合わせは、自動返信で目安を伝え、個別案件は担当者に通知する仕組みが効果的です。標準自動化パックがおすすめです。",
+    analysis: "納品や納期に関する問い合わせは、自動返信で一般的な目安を案内し、案件ごとの詳細は担当者に通知。顧客の「いつか」の不安にすぐ応えつつ、正確な回答は人が担当する二段階が適しています。",
+    patterns: ['standard', 'basic']
+  },
+  {
+    keywords: ['見積もり', '見積', 'お見積', '見積書', '見積金額', '見積もり金額'],
+    message: "分析が完了しました！見積もりに関する問い合わせは、自動返信で依頼方法を案内し、実際の見積は担当者に通知する仕組みが効果的です。標準自動化パックがおすすめです。",
+    analysis: "見積もりの問い合わせは、自動返信で「見積依頼の流れ」や「お問い合わせ窓口」を案内。個別の金額や条件は担当者に通知して対応する形が、漏れなく効率的です。",
+    patterns: ['standard', 'premium']
   },
   {
     keywords: ['対応', '対応は', '対応できますか', '対応して'],
@@ -380,9 +394,92 @@ const generateAnalysis = (analysis: ReturnType<typeof analyzeInquiryContent>): s
   return analysisText;
 };
 
+// --- 選択式診断 ---
+
+/** 選択式診断のオプション定義 */
+export const DIAGNOSTIC_OPTIONS = {
+  inquiryTypes: [
+    { id: 'shipping', label: '送料・価格' },
+    { id: 'reservation', label: '予約' },
+    { id: 'cancel', label: 'キャンセル・返金・交換' },
+    { id: 'hours', label: '営業時間' },
+    { id: 'inventory', label: '在庫の有無' },
+    { id: 'delivery', label: '納品・納期・発送' },
+    { id: 'estimate', label: '見積もり' },
+    { id: 'product', label: '商品の使い方・説明' },
+    { id: 'other', label: 'その他' },
+  ],
+  channels: [
+    { id: 'line', label: 'LINE' },
+    { id: 'mail', label: 'メール' },
+    { id: 'form', label: 'お問い合わせフォーム' },
+    { id: 'multiple', label: '複数のチャネルから' },
+  ],
+} as const;
+
+export interface DiagnosticSelection {
+  inquiryTypes: string[];
+  channels: string[];
+}
+
+/** 選択式診断: 選んだ項目から最適な提携パターンを提案 */
+export const analyzeBySelection = async (selection: DiagnosticSelection): Promise<AIDiagnosticResponse> => {
+  await new Promise(resolve => setTimeout(resolve, 600));
+
+  const { inquiryTypes, channels } = selection;
+  const hasMultipleChannels = channels.includes('multiple') || channels.length >= 2;
+
+  // 推奨パターンとメッセージを決定
+  let patternIds: string[];
+  let message: string;
+  let analysis: string;
+
+  if (hasMultipleChannels && inquiryTypes.length >= 3) {
+    patternIds = ['premium', 'standard', 'basic'];
+    message = "複数のチャネルと多様な問い合わせがある場合、全チャネル対応のプレミアム自動化パックが最適です。";
+    analysis = "LINE・メール・フォームなど複数チャネルに対応し、問い合わせの種類も多いため、統一した自動化システムで対応品質を保ちながら効率化できます。";
+  } else if (hasMultipleChannels || inquiryTypes.includes('estimate') || inquiryTypes.includes('delivery')) {
+    patternIds = ['standard', 'premium', 'basic'];
+    message = "納品・見積もりや複数チャネルへの対応には、標準自動化パックがおすすめです。";
+    analysis = "自動返信で案内や目安を伝えつつ、個別の案件は担当者に通知する仕組みで、漏れなく効率的に対応できます。";
+  } else if (
+    (inquiryTypes.includes('hours') || inquiryTypes.includes('shipping')) &&
+    inquiryTypes.length <= 2 &&
+    !hasMultipleChannels
+  ) {
+    patternIds = ['basic', 'standard'];
+    message = "営業時間や送料など、決まった回答で対応できる問い合わせが多いですね。基本自動化パックで十分効率化できます。";
+    analysis = "固定情報のため自動返信に最適です。シンプルな設定で、24時間いつでも正確に回答できます。";
+  } else if (inquiryTypes.includes('cancel') || inquiryTypes.includes('reservation')) {
+    patternIds = ['standard', 'basic', 'premium'];
+    message = "予約やキャンセル・返金の問い合わせは、自動返信と担当者への通知の組み合わせが効果的です。標準自動化パックがおすすめです。";
+    analysis = "自動返信でポリシーや流れを伝え、実際の処理が必要な場合は担当者に通知。二段階の対応で効率化できます。";
+  } else if (inquiryTypes.length === 0 && channels.length === 0) {
+    patternIds = ['standard'];
+    message = "まずは標準自動化パックから始めて、ご状況に合わせて調整するのがおすすめです。";
+    analysis = "お気軽にご相談ください。チャットで現状をお聞きして、最適なプランをご提案します。";
+  } else {
+    patternIds = ['standard', 'basic', 'premium'];
+    message = "選んでいただいた内容から、標準自動化パックがバランスよくおすすめです。";
+    analysis = "よくある質問の自動返信と、重要度に応じた担当者への通知で、対応時間の短縮と品質の向上が期待できます。";
+  }
+
+  const patterns = patternIds.map((id, index) => {
+    const p = PARTNERSHIP_PATTERNS.find(x => x.id === id);
+    return p ? { ...p, suitability: 100 - index * 20 } : null;
+  }).filter((p): p is PartnershipPattern => p !== null);
+
+  return {
+    aiMessage: message,
+    patterns: patterns.length > 0 ? patterns : [PARTNERSHIP_PATTERNS[1]],
+    analysis,
+  };
+};
+
 /**
  * Analyzes the inquiry text using rule-based logic and provides response with partnership patterns.
  * AI APIは使用せず、キーワードベースの分析を行います。
+ * @deprecated 選択式診断（analyzeBySelection）の利用を推奨
  */
 export const analyzeInquiry = async (text: string): Promise<AIDiagnosticResponse> => {
   // バリデーション
@@ -391,186 +488,6 @@ export const analyzeInquiry = async (text: string): Promise<AIDiagnosticResponse
     throw new Error(validation.errorMessage || "入力内容が不正です。");
   }
   
-  // 少し遅延を入れて、実際の分析処理をシミュレート
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
-  try {
-    // ルールベースの分析
-    const analysis = analyzeInquiryContent(text);
-    const recommendedPatternIds = recommendPatterns(analysis);
-    
-    // パターンを取得して適合度を設定
-    const patterns = recommendedPatternIds.map((id: string, index: number) => {
-      const pattern = PARTNERSHIP_PATTERNS.find(p => p.id === id);
-      if (pattern) {
-        return {
-          ...pattern,
-          suitability: 100 - (index * 20) // 最初の推奨が100%、次が80%、次が60%
-        };
-      }
-      return null;
-    }).filter((p: PartnershipPattern | null) => p !== null) as PartnershipPattern[];
-
-    return {
-      aiMessage: generateMessage(analysis, recommendedPatternIds),
-      patterns: patterns.length > 0 ? patterns : [PARTNERSHIP_PATTERNS[1]],
-      analysis: generateAnalysis(analysis)
-    };
-  } catch (error) {
-    console.error("Analysis Error:", error);
-    return {
-      aiMessage: "申し訳ございませんが、分析中にエラーが発生しました。直接ご相談いただけますと幸いです。",
-      patterns: [],
-      analysis: "分析中にエラーが発生しました。直接ご相談ください。"
-    };
-  }
-};
-
-// 定義済みの提携パターン
-const PARTNERSHIP_PATTERNS: PartnershipPattern[] = [
-  {
-    id: "basic",
-    name: "基本自動化パック",
-    description: "よくある質問の自動返信を実現。シンプルで導入しやすいパターンです。",
-    features: [
-      "よくある質問の自動返信（最大10パターン）",
-      "LINEまたはメールのいずれか1系統",
-      "基本的なFAQ管理",
-      "導入サポート（3日間）"
-    ],
-    priceRange: "〜10万円",
-    suitability: 0
-  },
-  {
-    id: "standard",
-    name: "標準自動化パック",
-    description: "複数チャネル対応と高度な自動化機能。多くの事業者に最適なバランス型です。",
-    features: [
-      "複数チャネル対応（LINE/メール/フォームから2系統）",
-      "よくある質問の自動返信（最大30パターン）",
-      "営業時間外の自動対応",
-      "重要度判定による通知機能",
-      "導入サポート（5日間）"
-    ],
-    priceRange: "10万円〜20万円",
-    suitability: 0
-  },
-  {
-    id: "premium",
-    name: "プレミアム自動化パック",
-    description: "完全自動化とカスタマイズ対応。本格的な業務効率化を実現します。",
-    features: [
-      "全チャネル対応（LINE/メール/フォーム）",
-      "無制限の自動返信パターン",
-      "AIによる文脈理解と柔軟な応答",
-      "CRM連携機能",
-      "カスタムワークフロー構築",
-      "導入サポート（10日間）+ 運用サポート（3ヶ月）"
-    ],
-    priceRange: "20万円〜",
-    suitability: 0
-  }
-];
-
-// キーワードベースの分析ロジック
-const analyzeInquiryContent = (text: string): {
-  complexity: 'simple' | 'medium' | 'complex';
-  channelCount: number;
-  keywords: string[];
-} => {
-  const lowerText = text.toLowerCase();
-  
-  // チャネル関連のキーワード
-  const channelKeywords = {
-    line: ['line', 'ライン', 'line@'],
-    mail: ['mail', 'メール', 'email', 'e-mail'],
-    form: ['form', 'フォーム', 'お問い合わせフォーム', '問い合わせフォーム']
-  };
-  
-  const channelCount = [
-    channelKeywords.line.some(kw => lowerText.includes(kw)),
-    channelKeywords.mail.some(kw => lowerText.includes(kw)),
-    channelKeywords.form.some(kw => lowerText.includes(kw))
-  ].filter(Boolean).length;
-  
-  // 複雑さを判定するキーワード
-  const simpleKeywords = ['送料', '価格', '料金', 'いくら', '値段', '営業時間', '時間', '場所', '住所', 'アクセス', 'キャンセル', '返金', '返品', '交換'];
-  const complexKeywords = ['カスタマイズ', '連携', 'api', 'システム', '統合', 'ワークフロー', 'crm', '複雑', '特殊', '独自'];
-  
-  const simpleCount = simpleKeywords.filter(kw => lowerText.includes(kw.toLowerCase())).length;
-  const complexCount = complexKeywords.filter(kw => lowerText.includes(kw.toLowerCase())).length;
-  
-  let complexity: 'simple' | 'medium' | 'complex' = 'medium';
-  if (complexCount > 0 || text.length > 500) {
-    complexity = 'complex';
-  } else if (simpleCount >= 2) {
-    complexity = 'simple';
-  }
-  
-  return {
-    complexity,
-    channelCount: channelCount || 1, // デフォルトは1
-    keywords: []
-  };
-};
-
-// パターン推奨ロジック
-const recommendPatterns = (analysis: ReturnType<typeof analyzeInquiryContent>): string[] => {
-  const { complexity, channelCount } = analysis;
-  
-  if (complexity === 'simple' && channelCount === 1) {
-    return ['basic', 'standard'];
-  } else if (complexity === 'complex' || channelCount >= 3) {
-    return ['premium', 'standard', 'basic'];
-  } else {
-    return ['standard', 'basic', 'premium'];
-  }
-};
-
-// メッセージ生成
-const generateMessage = (analysis: ReturnType<typeof analyzeInquiryContent>, patterns: string[]): string => {
-  const { complexity, channelCount } = analysis;
-  const mainPattern = patterns[0];
-  
-  if (mainPattern === 'basic') {
-    return "分析が完了しました！シンプルな自動返信で対応できる内容が多いですね。基本自動化パックが最適です。";
-  } else if (mainPattern === 'premium') {
-    return "分析が完了しました！複数のチャネルや高度な機能が必要な内容ですね。プレミアム自動化パックで完全対応できます。";
-  } else {
-    return "分析が完了しました！バランスの取れた自動化で効率化できそうです。標準自動化パックがおすすめです。";
-  }
-};
-
-// 分析結果の詳細生成
-const generateAnalysis = (analysis: ReturnType<typeof analyzeInquiryContent>): string => {
-  const { complexity, channelCount } = analysis;
-  
-  let analysisText = "問い合わせ内容を分析した結果、";
-  
-  if (channelCount >= 2) {
-    analysisText += "複数のチャネル（LINE/メール/フォーム）からの問い合わせがあることが分かりました。";
-  } else {
-    analysisText += "主に1つのチャネルからの問い合わせが多いことが分かりました。";
-  }
-  
-  if (complexity === 'simple') {
-    analysisText += "よくある質問が多く、シンプルな自動返信で対応できる内容です。";
-  } else if (complexity === 'complex') {
-    analysisText += "複雑な要件やカスタマイズが必要な内容が含まれています。";
-  } else {
-    analysisText += "標準的な自動化機能で対応できる内容です。";
-  }
-  
-  analysisText += "自動化により、対応時間の短縮と品質の向上が期待できます。";
-  
-  return analysisText;
-};
-
-/**
- * Analyzes the inquiry text using rule-based logic and provides response with partnership patterns.
- * AI APIは使用せず、キーワードベースの分析を行います。
- */
-export const analyzeInquiry = async (text: string): Promise<AIDiagnosticResponse> => {
   // 少し遅延を入れて、実際の分析処理をシミュレート
   await new Promise(resolve => setTimeout(resolve, 800));
   

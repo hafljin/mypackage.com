@@ -14,7 +14,7 @@ import {
   UserCheck,
   Sparkles
 } from 'lucide-react';
-import { analyzeInquiry, validateInquiry } from './services/geminiService';
+import { analyzeBySelection, DIAGNOSTIC_OPTIONS } from './services/geminiService';
 import { AIDiagnosticResponse } from './types';
 
 // --- Sub-components ---
@@ -62,10 +62,10 @@ const CTAButton = ({
 // --- Main App ---
 
 export default function App() {
-  const [inquiryText, setInquiryText] = useState("");
+  const [selectedInquiryTypes, setSelectedInquiryTypes] = useState<string[]>([]);
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [diagnosticResult, setDiagnosticResult] = useState<AIDiagnosticResponse | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
   const [checkedItems, setCheckedItems] = useState<number[]>([]);
 
   const toggleCheck = (idx: number) => {
@@ -74,32 +74,45 @@ export default function App() {
     );
   };
 
+  const toggleInquiryType = (id: string) => {
+    setSelectedInquiryTypes(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleChannel = (id: string) => {
+    setSelectedChannels(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const hasSelection = selectedInquiryTypes.length > 0 || selectedChannels.length > 0;
+
   const handleAnalyze = async () => {
-    if (!inquiryText.trim()) {
-      setValidationError("問い合わせ内容を入力してください。");
-      return;
-    }
-    
-    // バリデーション
-    const validation = validateInquiry(inquiryText);
-    if (!validation.isValid) {
-      setValidationError(validation.errorMessage || "入力内容が不正です。");
-      setDiagnosticResult(null);
-      return;
-    }
-    
-    setValidationError(null);
+    if (!hasSelection) return;
     setIsAnalyzing(true);
-    
+    setDiagnosticResult(null);
     try {
-      const result = await analyzeInquiry(inquiryText);
+      const result = await analyzeBySelection({
+        inquiryTypes: selectedInquiryTypes,
+        channels: selectedChannels,
+      });
       setDiagnosticResult(result);
     } catch (error) {
-      setValidationError(error instanceof Error ? error.message : "分析中にエラーが発生しました。");
-      setDiagnosticResult(null);
+      setDiagnosticResult({
+        aiMessage: "申し訳ございません。診断中にエラーが発生しました。",
+        patterns: [],
+        analysis: "",
+      });
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleReset = () => {
+    setSelectedInquiryTypes([]);
+    setSelectedChannels([]);
+    setDiagnosticResult(null);
   };
 
   return (
@@ -140,8 +153,8 @@ export default function App() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-            <CTAButton>無料相談（チャット完結）</CTAButton>
-            <CTAButton secondary>今の対応内容を送る</CTAButton>
+            <CTAButton secondary>無料相談（チャット完結）</CTAButton>
+            <CTAButton secondary>お見積もりはこちら</CTAButton>
           </div>
           <p className="mt-4 text-blue-100 text-sm italic">※電話やMTGは不要です。チャットのみで完結します。</p>
         </div>
@@ -251,43 +264,70 @@ export default function App() {
         </div>
       </Section>
 
-      {/* AI Diagnostic (Bonus Feature) */}
+      {/* 自動診断（選択式） */}
       <Section className="bg-indigo-900 text-white">
         <div className="max-w-3xl mx-auto">
           <Heading className="text-white">【自動診断】今の対応を分析してみる</Heading>
           <p className="text-center mb-8 text-indigo-100">
-            実際にお客様に送っている返信や、よく来る問い合わせを入力してください。<br />
-            自動化のプロが無料でアドバイスします。
+            当てはまるものを選んで「診断する」を押してください。<br />
+            どのパックが合うか、無料でアドバイスします。
           </p>
           <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20">
-            <textarea 
-              value={inquiryText}
-              onChange={(e) => {
-                setInquiryText(e.target.value);
-                setValidationError(null); // 入力時にエラーをクリア
-              }}
-              placeholder="例：『送料はいくらですか？』『予約のキャンセルはできますか？』などのよくある質問を入力..."
-              className={`w-full h-32 p-4 rounded-xl bg-white text-slate-900 mb-4 focus:ring-2 focus:ring-blue-400 outline-none ${
-                validationError ? 'border-2 border-red-400' : ''
-              }`}
-            />
-            {validationError && (
-              <div className="mb-4 p-4 bg-red-500/20 border border-red-400/50 rounded-xl">
-                <p className="text-red-200 text-sm whitespace-pre-line">{validationError}</p>
-              </div>
-            )}
-            <button 
-              onClick={handleAnalyze}
-              disabled={isAnalyzing || !inquiryText.trim()}
-              className="w-full py-4 bg-white text-indigo-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50"
-            >
-              {isAnalyzing ? "分析中..." : "無料で自動化アドバイスを受ける"}
-            </button>
-            {diagnosticResult && (
-              <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                {/* AI風のメッセージ */}
+            {!diagnosticResult ? (
+              <>
+                {/* 問い合わせの種類 */}
+                <div className="mb-6">
+                  <p className="text-indigo-200 font-bold mb-3">お客様からよくある問い合わせ（複数可）</p>
+                  <div className="flex flex-wrap gap-2">
+                    {DIAGNOSTIC_OPTIONS.inquiryTypes.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => toggleInquiryType(opt.id)}
+                        className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                          selectedInquiryTypes.includes(opt.id)
+                            ? 'bg-white text-indigo-900'
+                            : 'bg-white/10 text-indigo-100 border border-white/20 hover:bg-white/20'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* チャネル */}
+                <div className="mb-6">
+                  <p className="text-indigo-200 font-bold mb-3">主にどのチャネルから来ますか？（複数可）</p>
+                  <div className="flex flex-wrap gap-2">
+                    {DIAGNOSTIC_OPTIONS.channels.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => toggleChannel(opt.id)}
+                        className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                          selectedChannels.includes(opt.id)
+                            ? 'bg-white text-indigo-900'
+                            : 'bg-white/10 text-indigo-100 border border-white/20 hover:bg-white/20'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button 
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || !hasSelection}
+                  className="w-full py-4 bg-white text-indigo-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAnalyzing ? "診断中..." : "診断する"}
+                </button>
+              </>
+            ) : (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                {/* 診断結果 */}
                 <div className="p-6 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/20 rounded-2xl backdrop-blur-sm">
-                  <div className="flex items-start gap-3 mb-3">
+                  <div className="flex items-start gap-3">
                     <div className="w-10 h-10 bg-blue-400/30 rounded-full flex items-center justify-center flex-shrink-0">
                       <Sparkles className="w-5 h-5 text-blue-200" />
                     </div>
@@ -298,17 +338,15 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 分析結果の詳細 */}
                 {diagnosticResult.analysis && (
                   <div className="p-6 bg-white/5 border border-white/10 rounded-2xl">
                     <h5 className="font-bold text-blue-300 mb-3 flex items-center gap-2">
                       <Zap className="w-4 h-4" /> 詳細分析
                     </h5>
-                    <div className="text-indigo-50 leading-relaxed whitespace-pre-wrap">{diagnosticResult.analysis}</div>
+                    <p className="text-indigo-50 leading-relaxed">{diagnosticResult.analysis}</p>
                   </div>
                 )}
 
-                {/* 提携パターンの提案 */}
                 {diagnosticResult.patterns && diagnosticResult.patterns.length > 0 && (
                   <div className="space-y-4">
                     <h5 className="font-bold text-blue-300 text-lg flex items-center gap-2">
@@ -370,6 +408,14 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="w-full py-3 border-2 border-white/30 text-indigo-100 font-bold rounded-xl hover:bg-white/10 transition-colors"
+                >
+                  診断をやり直す
+                </button>
               </div>
             )}
           </div>
@@ -443,7 +489,16 @@ export default function App() {
       <Section className="bg-slate-900 text-white rounded-t-[4rem]">
         <div className="flex flex-col md:flex-row items-center gap-12">
           <div className="w-48 h-48 md:w-64 md:h-64 bg-slate-800 rounded-3xl overflow-hidden shadow-2xl transform rotate-3 relative border-4 border-slate-700 flex-shrink-0">
-            <img src="https://picsum.photos/400/400" alt="Profile" className="w-full h-full object-cover grayscale" />
+            <img 
+              src="/profile.jpg" 
+              alt="対応する人" 
+              className="w-full h-full object-cover object-top"
+              onError={(e) => {
+                // 画像が読み込めない場合、プレースホルダーを表示
+                const target = e.target as HTMLImageElement;
+                target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuaXoOWbvueJhzwvdGV4dD48L3N2Zz4=';
+              }}
+            />
           </div>
           <div>
             <h4 className="text-3xl font-bold mb-6">対応する人</h4>
@@ -462,7 +517,7 @@ export default function App() {
               </p>
               <div className="pt-6 border-t border-slate-800 mt-6">
                 <p className="text-sm italic">
-                  「大企業向けの高額ツールは必要ありません。あなたの今の運用に合わせた、無理のない自動化を提案します。」
+                  「今の運用に合わせた、無理のない自動化を提案します。」
                 </p>
               </div>
             </div>
@@ -478,13 +533,16 @@ export default function App() {
           強引な営業もありません。お気軽にご連絡ください。
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="px-10 py-5 bg-white text-blue-600 font-bold text-xl rounded-full shadow-2xl hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
+          <button className="px-10 py-5 bg-blue-700 text-white font-bold text-xl rounded-full border-2 border-white/20 hover:bg-blue-800 transition-all flex items-center justify-center gap-2">
             無料相談（チャット完結） <ArrowRight className="w-6 h-6" />
           </button>
-          <button className="px-10 py-5 bg-blue-700 text-white font-bold text-xl rounded-full border-2 border-white/20 hover:bg-blue-800 transition-all">
-            今の問い合わせ内容を送る
+          <button className="px-10 py-5 bg-blue-700 text-white font-bold text-xl rounded-full border-2 border-white/20 hover:bg-blue-800 transition-all flex items-center justify-center gap-2">
+            お見積もりはこちら
           </button>
         </div>
+        <p className="mt-4 text-blue-200 text-sm">
+          ※返信例やよく来る質問を送っていただくと、より正確なお見積もりが可能です。
+        </p>
       </Section>
 
       <footer className="py-8 text-center text-slate-400 text-sm bg-slate-950 border-t border-slate-900">
