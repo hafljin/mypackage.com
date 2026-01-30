@@ -139,57 +139,57 @@ const ChatDemo = () => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-blue-100 overflow-hidden max-w-3xl mx-auto">
-      {/* チャットヘッダー */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-4 px-6 flex items-center gap-3">
-        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-          <Bot className="w-6 h-6" />
+    <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-3xl mx-auto" style={{ border: '1px solid #e5e5e5' }}>
+      {/* LINEヘッダー */}
+      <div className="bg-[#06C755] text-white py-2.5 sm:py-3 px-3 sm:px-4 flex items-center gap-2 sm:gap-3">
+        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+          <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-[#06C755]" />
         </div>
-        <div>
-          <h3 className="font-bold">店舗ボット（デモ）</h3>
-          <p className="text-xs text-blue-100">オンライン</p>
+        <div className="flex-1">
+          <h3 className="font-bold text-sm sm:text-base">店舗公式アカウント</h3>
         </div>
-        <div className="ml-auto">
-          <span className="px-3 py-1 bg-blue-500/30 rounded-full text-xs font-medium">モック版</span>
-        </div>
+        <div className="text-[10px] sm:text-xs bg-white/20 px-2 py-1 rounded">デモ</div>
       </div>
 
-      {/* メッセージリスト */}
-      <div ref={messagesContainerRef} className="h-[400px] overflow-y-auto p-6 space-y-4 bg-slate-50">
+      {/* メッセージリスト（LINE風背景） */}
+      <div 
+        ref={messagesContainerRef} 
+        className="h-[300px] sm:h-[350px] md:h-[450px] overflow-y-auto p-4 space-y-3"
+        style={{ 
+          background: 'linear-gradient(to bottom, #f7f7f7 0%, #ebebeb 100%)'
+        }}
+      >
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex gap-3 ${
+            className={`flex gap-2 ${
               message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
             }`}
           >
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                message.sender === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-green-600 text-white'
-              }`}
-            >
-              {message.sender === 'user' ? (
-                <User className="w-5 h-5" />
-              ) : (
-                <Bot className="w-5 h-5" />
-              )}
-            </div>
+            {/* アイコン（ボットのみ表示） */}
+            {message.sender === 'bot' && (
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border border-gray-200">
+                <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-[#06C755]" />
+              </div>
+            )}
 
-            <div
-              className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                message.sender === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-slate-800 border border-slate-200 shadow-sm'
-              }`}
-            >
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                {message.text}
-              </p>
+            {/* メッセージバブル */}
+            <div className="flex flex-col gap-1 max-w-[80%] sm:max-w-[75%]">
+              <div
+                className={`px-3 py-2 sm:px-4 sm:py-2.5 ${
+                  message.sender === 'user'
+                    ? 'bg-[#06C755] text-white rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl'
+                    : 'bg-white text-gray-800 rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl shadow-sm'
+                }`}
+                style={message.sender === 'bot' ? { border: '1px solid #e5e5e5' } : {}}
+              >
+                <p className="whitespace-pre-wrap text-sm sm:text-[15px] leading-relaxed">
+                  {message.text}
+                </p>
+              </div>
               <p
-                className={`text-xs mt-2 ${
-                  message.sender === 'user' ? 'text-blue-100' : 'text-slate-400'
+                className={`text-[10px] sm:text-[11px] text-gray-500 px-1 ${
+                  message.sender === 'user' ? 'text-right' : 'text-left'
                 }`}
               >
                 {message.timestamp.toLocaleTimeString('ja-JP', {
@@ -201,16 +201,17 @@ const ChatDemo = () => {
           </div>
         ))}
 
+        {/* ローディング表示 */}
         {isLoading && (
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center">
-              <Bot className="w-5 h-5" />
+          <div className="flex gap-2">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border border-gray-200">
+              <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-[#06C755]" />
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-sm">
+            <div className="bg-white px-3 py-2 sm:px-4 sm:py-3 rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl shadow-sm" style={{ border: '1px solid #e5e5e5' }}>
               <div className="flex gap-1">
-                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-100"></div>
-                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-200"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
               </div>
             </div>
           </div>
@@ -219,15 +220,15 @@ const ChatDemo = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* クイック返信 */}
-      <div className="px-6 py-3 bg-white border-t border-slate-200">
-        <div className="flex flex-wrap gap-2">
+      {/* クイック返信（LINE風） */}
+      <div className="px-3 py-2 sm:px-4 sm:py-3 bg-white border-t border-gray-200">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {quickReplies.map((reply, idx) => (
             <button
               key={idx}
               onClick={() => handleQuickReply(reply)}
               disabled={isLoading}
-              className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm bg-white text-gray-700 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
               {reply}
             </button>
@@ -235,24 +236,24 @@ const ChatDemo = () => {
         </div>
       </div>
 
-      {/* 入力エリア */}
-      <div className="p-4 bg-white border-t border-slate-200">
-        <div className="flex gap-3">
+      {/* 入力エリア（LINE風） */}
+      <div className="p-2 sm:p-3 bg-white border-t border-gray-200">
+        <div className="flex gap-2 items-center">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="メッセージを入力..."
+            placeholder="メッセージを入力"
             disabled={isLoading}
-            className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2 sm:px-4 sm:py-2.5 bg-gray-50 border border-gray-300 rounded-full focus:outline-none focus:border-[#06C755] focus:bg-white disabled:bg-gray-100 disabled:cursor-not-allowed text-sm sm:text-[15px]"
           />
           <button
             onClick={handleSendMessage}
             disabled={!inputText.trim() || isLoading}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+            className="w-9 h-9 sm:w-10 sm:h-10 bg-[#06C755] text-white rounded-full hover:bg-[#05b34c] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 shadow-sm"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
@@ -290,54 +291,54 @@ export default function App() {
         
         <div className="max-w-5xl mx-auto px-6 relative z-10 text-center md:text-left">
           <div className="inline-block px-4 py-1.5 mb-6 bg-blue-500/30 backdrop-blur-md rounded-full text-sm font-medium border border-white/20">
-            小規模事業者・店舗向け
+            飲食店・小規模店舗向け
           </div>
           <Heading level={1} className="mb-8">
-            問い合わせ対応に追われて、<br className="hidden md:block" />
-            <span className="text-blue-200">本業が止まっていませんか？</span>
+            電話に出られない時間帯の<br className="hidden md:block" />
+            <span className="text-blue-200">問い合わせ、逃していませんか？</span>
           </Heading>
           <p className="text-xl md:text-2xl mb-10 text-blue-50/90 leading-relaxed font-medium">
-            LINE／フォーム／メールの問い合わせ対応を<br />
-            最短3日で"ほぼ自動化"します
+            夜間・混雑時でも問い合わせを自動受付<br />
+            営業時間や予約の質問に24時間対応
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 max-w-3xl">
             <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10">
               <CheckCircle2 className="text-blue-300 w-6 h-6 flex-shrink-0" />
-              <span className="font-medium">よくある質問は自動回答</span>
+              <span className="font-medium">夜間・混雑時も自動対応</span>
             </div>
             <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10">
               <CheckCircle2 className="text-blue-300 w-6 h-6 flex-shrink-0" />
-              <span className="font-medium">営業時間外も一次対応</span>
+              <span className="font-medium">問い合わせを逃さない</span>
             </div>
             <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10">
               <CheckCircle2 className="text-blue-300 w-6 h-6 flex-shrink-0" />
-              <span className="font-medium">人を増やさず運用改善</span>
+              <span className="font-medium">電話対応の負担を軽減</span>
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
             <CTAButton onClick={scrollToDemo}>
               <Sparkles className="w-5 h-5 mr-2" />
-              デモを試す
+              無料デモを試す
             </CTAButton>
-            <CTAButton secondary>無料相談（チャット完結）</CTAButton>
+            <CTAButton secondary>導入相談（無料）</CTAButton>
           </div>
-          <p className="mt-4 text-blue-100 text-sm italic">※電話やMTGは不要です。チャットのみで完結します。</p>
+          <p className="mt-4 text-blue-100 text-sm italic">※費用はかかりません。まずはデモで体験してください。</p>
         </div>
       </header>
 
       {/* 2. Empathy Section */}
       <Section className="bg-white">
-        <Heading>こんな状態、ありませんか？</Heading>
+        <Heading>飲食店でこんなお悩み、ありませんか？</Heading>
         <div className="max-w-2xl mx-auto bg-slate-50 p-8 rounded-3xl border border-slate-200">
           <div className="space-y-4">
             {[
-              "問い合わせ対応で作業が止まる",
-              "同じ質問に何度も答えている",
-              "LINE・フォーム・メールがバラバラ",
-              "忙しい時間帯に限って問い合わせが来る",
-              "対応漏れ・返信遅れが怖い"
+              "ランチ・ディナーの混雑時に電話が鳴り続ける",
+              "夜間の問い合わせに翌日対応で機会損失",
+              "「営業時間は？」「予約できる？」同じ質問ばかり",
+              "電話に出られず、お客様を逃している気がする",
+              "口コミで「電話が繋がらない」と書かれた"
             ].map((item, idx) => (
               <button 
                 key={idx}
@@ -361,25 +362,25 @@ export default function App() {
 
       {/* 3. Solution (Before/After) */}
       <Section className="bg-slate-50">
-        <Heading>その問い合わせ対応, こう変えます</Heading>
+        <Heading>電話対応、こう変わります</Heading>
         <div className="grid md:grid-cols-2 gap-8">
           {/* Before */}
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
             <h4 className="text-xl font-bold mb-6 text-red-500 flex items-center gap-2">
-              <Clock className="w-5 h-5" /> 現在の状態（Before）
+              <Clock className="w-5 h-5" /> 導入前（Before）
             </h4>
             <ul className="space-y-4">
               <li className="flex gap-3 text-slate-500">
                 <span className="text-red-400 font-bold text-lg leading-none">×</span>
-                <span>人が全部対応（休みがない）</span>
+                <span>混雑時は電話に出られない</span>
               </li>
               <li className="flex gap-3 text-slate-500">
                 <span className="text-red-400 font-bold text-lg leading-none">×</span>
-                <span>内容が属人化（あなたしか返せない）</span>
+                <span>夜間の問い合わせは翌日対応</span>
               </li>
               <li className="flex gap-3 text-slate-500">
                 <span className="text-red-400 font-bold text-lg leading-none">×</span>
-                <span>忙しいほど品質が落ちる</span>
+                <span>機会損失がどれくらいか分からない</span>
               </li>
             </ul>
           </div>
@@ -392,15 +393,15 @@ export default function App() {
             <ul className="space-y-4">
               <li className="flex gap-3">
                 <CheckCircle2 className="w-5 h-5 text-blue-300 flex-shrink-0" />
-                <span>よくある内容は自動返信（24時間稼働）</span>
+                <span>営業時間・予約は24時間自動回答</span>
               </li>
               <li className="flex gap-3">
                 <CheckCircle2 className="w-5 h-5 text-blue-300 flex-shrink-0" />
-                <span>必要なものだけ人に通知（集中できる）</span>
+                <span>夜間・混雑時も問い合わせを逃さない</span>
               </li>
               <li className="flex gap-3">
                 <CheckCircle2 className="w-5 h-5 text-blue-300 flex-shrink-0" />
-                <span>忙しくても対応品質が一定</span>
+                <span>電話対応の負担が大幅に軽減</span>
               </li>
             </ul>
           </div>
@@ -411,14 +412,14 @@ export default function App() {
       {showDemo && (
         <Section id="demo" className="bg-gradient-to-br from-indigo-50 via-blue-50 to-white">
           <div className="text-center mb-12">
-            <Heading>【デモ】実際に試してみる</Heading>
+            <Heading>【無料デモ】実際の動きを体験</Heading>
             <p className="text-slate-600 text-lg mb-4">
-              飲食店の営業時間問い合わせボットのデモです。<br />
+              夜間や混雑時でも、こんな風に自動で対応します。<br />
               実際にメッセージを送って、自動応答を体験してください。
             </p>
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
               <Sparkles className="w-4 h-4" />
-              現在はモック版 / 本番はGPT-5 nano使用予定
+              費用はかかりません / 本番はAI使用でより自然な対応
             </div>
           </div>
           
@@ -426,7 +427,7 @@ export default function App() {
 
           <div className="mt-8 text-center text-slate-500 text-sm space-y-2">
             <p>💡 試してみよう: 「営業時間を教えて」「今日は営業していますか？」「予約したいです」</p>
-            <p className="text-xs">※ このデモはモック版です。本番環境ではGPT-5 nanoを使用して、より自然で柔軟な応答が可能になります。</p>
+            <p className="text-xs">※ このデモはモック版です。本番環境ではAIを使用して、より自然で柔軟な応答が可能になります。</p>
           </div>
         </Section>
       )}
@@ -434,8 +435,8 @@ export default function App() {
       {/* 5. Package Content */}
       <Section className="bg-white">
         <div className="text-center mb-16">
-          <Heading>提供内容：問い合わせ対応自動化パック</Heading>
-          <p className="text-slate-500">難しい技術のことは不要。運用に合わせた最適な仕組みを構築します。</p>
+          <Heading>導入の流れ（最短3日で稼働）</Heading>
+          <p className="text-slate-500">難しい技術のことは不要。お店の運用に合わせた仕組みを構築します。</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {[
@@ -460,30 +461,33 @@ export default function App() {
         <div className="grid md:grid-cols-2 gap-12">
           <div>
             <h4 className="text-2xl font-bold mb-6 text-blue-900 flex items-center gap-2">
-              <CheckCircle2 className="w-6 h-6 text-blue-600" /> 対象となる方
+              <CheckCircle2 className="w-6 h-6 text-blue-600" /> こんなお店におすすめ
             </h4>
             <ul className="space-y-4">
               <li className="flex items-center gap-3 text-slate-700 bg-white p-4 rounded-xl shadow-sm">
-                <span>小規模事業者・個人店舗</span>
+                <span>飲食店・カフェ・居酒屋など</span>
               </li>
               <li className="flex items-center gap-3 text-slate-700 bg-white p-4 rounded-xl shadow-sm">
-                <span>人手不足・とにかく忙しい</span>
+                <span>混雑時に電話に出られない</span>
               </li>
               <li className="flex items-center gap-3 text-slate-700 bg-white p-4 rounded-xl shadow-sm">
-                <span>問い合わせが定型化している</span>
+                <span>夜間の問い合わせを逃している</span>
+              </li>
+              <li className="flex items-center gap-3 text-slate-700 bg-white p-4 rounded-xl shadow-sm">
+                <span>口コミ評価を改善したい</span>
               </li>
             </ul>
           </div>
           <div>
             <h4 className="text-2xl font-bold mb-6 text-slate-400 flex items-center gap-2">
-              <span className="w-6 h-6 flex items-center justify-center font-bold text-lg leading-none">×</span> お力になれない方
+              <span className="w-6 h-6 flex items-center justify-center font-bold text-lg leading-none">×</span> 対象外のケース
             </h4>
             <ul className="space-y-4">
               <li className="flex items-center gap-3 text-slate-400 border border-slate-200 p-4 rounded-xl">
-                <span>大規模コールセンター</span>
+                <span>大規模チェーン店</span>
               </li>
               <li className="flex items-center gap-3 text-slate-400 border border-slate-200 p-4 rounded-xl">
-                <span>複雑すぎる業務フロー</span>
+                <span>複雑な予約システムが必要</span>
               </li>
               <li className="flex items-center gap-3 text-slate-400 border border-slate-200 p-4 rounded-xl">
                 <span>電話対応のみを希望</span>
@@ -559,10 +563,10 @@ export default function App() {
 
       {/* 9. Final CTA */}
       <Section className="bg-blue-600 text-white text-center">
-        <Heading className="text-white mb-6">まずは"今の状態"を教えてください</Heading>
+        <Heading className="text-white mb-6">まずは無料デモで体験してください</Heading>
         <p className="mb-12 text-blue-100 text-lg">
-          相談は無料、チャットのみで完結します。<br />
-          強引な営業もありません。お気軽にご連絡ください。
+          費用はかかりません。デモを試すだけでもOKです。<br />
+          夜間・混雑時の問い合わせ、逃さない仕組みを体験してください。
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button 
@@ -570,10 +574,10 @@ export default function App() {
             className="px-10 py-5 bg-blue-700 text-white font-bold text-xl rounded-full border-2 border-white/20 hover:bg-blue-800 transition-all flex items-center justify-center gap-2"
           >
             <Sparkles className="w-6 h-6" />
-            まずはデモを試す
+            無料デモを試す
           </button>
           <button className="px-10 py-5 bg-blue-700 text-white font-bold text-xl rounded-full border-2 border-white/20 hover:bg-blue-800 transition-all flex items-center justify-center gap-2">
-            無料相談（チャット完結） <ArrowRight className="w-6 h-6" />
+            導入相談（無料） <ArrowRight className="w-6 h-6" />
           </button>
         </div>
       </Section>
