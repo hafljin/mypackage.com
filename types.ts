@@ -1,54 +1,21 @@
-
-export interface DiagnosticResult {
-  category: string;
-  automationPotential: number;
-  suggestion: string;
-}
-
-export interface InquirySample {
-  text: string;
-  channel: 'LINE' | 'Form' | 'Mail';
-}
-
-// 提携パターンの型定義
-export interface PartnershipPattern {
+// LINEボットのメッセージ型定義
+export interface ChatMessage {
   id: string;
-  name: string;
-  description: string;
-  features: string[];
-  priceRange?: string;
-  suitability: number; // 0-100の適合度
-}
-
-export interface DiagnosticResult {
-  category: string;
-  automationPotential: number;
-  suggestion: string;
-}
-
-export interface InquirySample {
   text: string;
-  channel: 'LINE' | 'Form' | 'Mail';
+  sender: 'user' | 'bot';
+  timestamp: Date;
 }
 
-// 提携パターンの型定義
-export interface PartnershipPattern {
-  id: string;
-  name: string;
-  description: string;
-  features: string[];
-  priceRange?: string;
-  suitability: number; // 0-100の適合度
+// LINEボットの応答型定義
+export interface BotResponse {
+  message: string;
+  timestamp: Date;
 }
 
-export interface AIDiagnosticResponse {
-  aiMessage: string; // AI風の応答メッセージ
-  patterns: PartnershipPattern[]; // 提案される提携パターン
-  analysis: string; // 分析結果の詳細
-}
-
-// バリデーション結果
-export interface ValidationResult {
-  isValid: boolean;
-  errorMessage?: string;
+// 営業時間情報
+export interface BusinessHours {
+  dayOfWeek: string;
+  open: string;
+  close: string;
+  isHoliday: boolean;
 }

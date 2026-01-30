@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   CheckCircle2, 
   ArrowRight, 
@@ -7,19 +6,20 @@ import {
   Zap, 
   Clock, 
   ShieldCheck, 
-  ChevronDown,
   Mail,
   Smartphone,
   ClipboardList,
   UserCheck,
+  Send,
+  Bot,
+  User,
   Sparkles
 } from 'lucide-react';
-import { analyzeBySelection, DIAGNOSTIC_OPTIONS } from './services/geminiService';
-import { AIDiagnosticResponse } from './types';
+import { getBotResponse } from './services/geminiService';
+import { ChatMessage } from './types';
 
 // --- Sub-components ---
 
-// Fix: Making children optional in the type definition resolves JSX property missing errors.
 const Section = ({ children, className = "", id = "" }: { children?: React.ReactNode, className?: string, id?: string }) => (
   <section id={id} className={`py-16 md:py-24 px-6 md:px-12 ${className}`}>
     <div className="max-w-5xl mx-auto">
@@ -28,14 +28,12 @@ const Section = ({ children, className = "", id = "" }: { children?: React.React
   </section>
 );
 
-// Fix: Making children optional in the type definition resolves JSX property missing errors.
 const Heading = ({ children, level = 2, className = "" }: { children?: React.ReactNode, level?: 1 | 2 | 3, className?: string }) => {
   if (level === 1) return <h1 className={`text-4xl md:text-6xl font-bold leading-tight ${className}`}>{children}</h1>;
   if (level === 2) return <h2 className={`text-3xl md:text-4xl font-bold mb-8 text-center ${className}`}>{children}</h2>;
   return <h3 className={`text-xl font-bold mb-4 ${className}`}>{children}</h3>;
 };
 
-// Fix: Making children optional in the type definition resolves JSX property missing errors.
 const CTAButton = ({ 
   children, 
   secondary = false, 
@@ -59,14 +57,214 @@ const CTAButton = ({
   </button>
 );
 
+// --- Chat Component ---
+
+const ChatDemo = () => {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: '1',
+      text: 'いらっしゃいませ！当店へのお問い合わせありがとうございます。\n営業時間、予約、メニュー、アクセスなど、お気軽にお尋ねください。',
+      sender: 'bot',
+      timestamp: new Date(),
+    }
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // メッセージコンテナの最下部までスクロール
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages, isLoading]);
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || isLoading) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      text: inputText,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputText('');
+    setIsLoading(true);
+
+    try {
+      const botResponse = await getBotResponse(inputText);
+      
+      const botMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        text: botResponse.message,
+        sender: 'bot',
+        timestamp: botResponse.timestamp,
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error getting bot response:', error);
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        text: '申し訳ございません。エラーが発生しました。もう一度お試しください。',
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const quickReplies = [
+    '営業時間を教えて',
+    '今日は営業していますか？',
+    '予約したいです',
+    'メニューを見たい',
+    'アクセスを教えて',
+  ];
+
+  const handleQuickReply = (text: string) => {
+    setInputText(text);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-xl border border-blue-100 overflow-hidden max-w-3xl mx-auto">
+      {/* チャットヘッダー */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-4 px-6 flex items-center gap-3">
+        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+          <Bot className="w-6 h-6" />
+        </div>
+        <div>
+          <h3 className="font-bold">店舗ボット（デモ）</h3>
+          <p className="text-xs text-blue-100">オンライン</p>
+        </div>
+        <div className="ml-auto">
+          <span className="px-3 py-1 bg-blue-500/30 rounded-full text-xs font-medium">モック版</span>
+        </div>
+      </div>
+
+      {/* メッセージリスト */}
+      <div ref={messagesContainerRef} className="h-[400px] overflow-y-auto p-6 space-y-4 bg-slate-50">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex gap-3 ${
+              message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
+            }`}
+          >
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                message.sender === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-green-600 text-white'
+              }`}
+            >
+              {message.sender === 'user' ? (
+                <User className="w-5 h-5" />
+              ) : (
+                <Bot className="w-5 h-5" />
+              )}
+            </div>
+
+            <div
+              className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                message.sender === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-slate-800 border border-slate-200 shadow-sm'
+              }`}
+            >
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {message.text}
+              </p>
+              <p
+                className={`text-xs mt-2 ${
+                  message.sender === 'user' ? 'text-blue-100' : 'text-slate-400'
+                }`}
+              >
+                {message.timestamp.toLocaleTimeString('ja-JP', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            </div>
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="flex gap-3">
+            <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-sm">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-100"></div>
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-200"></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* クイック返信 */}
+      <div className="px-6 py-3 bg-white border-t border-slate-200">
+        <div className="flex flex-wrap gap-2">
+          {quickReplies.map((reply, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleQuickReply(reply)}
+              disabled={isLoading}
+              className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {reply}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 入力エリア */}
+      <div className="p-4 bg-white border-t border-slate-200">
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="メッセージを入力..."
+            disabled={isLoading}
+            className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!inputText.trim() || isLoading}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
-  const [selectedInquiryTypes, setSelectedInquiryTypes] = useState<string[]>([]);
-  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
-  const [diagnosticResult, setDiagnosticResult] = useState<AIDiagnosticResponse | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [checkedItems, setCheckedItems] = useState<number[]>([]);
+  const [showDemo, setShowDemo] = useState(false);
 
   const toggleCheck = (idx: number) => {
     setCheckedItems(prev => 
@@ -74,45 +272,11 @@ export default function App() {
     );
   };
 
-  const toggleInquiryType = (id: string) => {
-    setSelectedInquiryTypes(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
-  const toggleChannel = (id: string) => {
-    setSelectedChannels(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
-  const hasSelection = selectedInquiryTypes.length > 0 || selectedChannels.length > 0;
-
-  const handleAnalyze = async () => {
-    if (!hasSelection) return;
-    setIsAnalyzing(true);
-    setDiagnosticResult(null);
-    try {
-      const result = await analyzeBySelection({
-        inquiryTypes: selectedInquiryTypes,
-        channels: selectedChannels,
-      });
-      setDiagnosticResult(result);
-    } catch (error) {
-      setDiagnosticResult({
-        aiMessage: "申し訳ございません。診断中にエラーが発生しました。",
-        patterns: [],
-        analysis: "",
-      });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleReset = () => {
-    setSelectedInquiryTypes([]);
-    setSelectedChannels([]);
-    setDiagnosticResult(null);
+  const scrollToDemo = () => {
+    setShowDemo(true);
+    setTimeout(() => {
+      document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   return (
@@ -134,7 +298,7 @@ export default function App() {
           </Heading>
           <p className="text-xl md:text-2xl mb-10 text-blue-50/90 leading-relaxed font-medium">
             LINE／フォーム／メールの問い合わせ対応を<br />
-            最短3日で“ほぼ自動化”します
+            最短3日で"ほぼ自動化"します
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 max-w-3xl">
@@ -153,8 +317,11 @@ export default function App() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+            <CTAButton onClick={scrollToDemo}>
+              <Sparkles className="w-5 h-5 mr-2" />
+              デモを試す
+            </CTAButton>
             <CTAButton secondary>無料相談（チャット完結）</CTAButton>
-            <CTAButton secondary>お見積もりはこちら</CTAButton>
           </div>
           <p className="mt-4 text-blue-100 text-sm italic">※電話やMTGは不要です。チャットのみで完結します。</p>
         </div>
@@ -240,7 +407,31 @@ export default function App() {
         </div>
       </Section>
 
-      {/* 4. Package Content */}
+      {/* 4. Demo Section */}
+      {showDemo && (
+        <Section id="demo" className="bg-gradient-to-br from-indigo-50 via-blue-50 to-white">
+          <div className="text-center mb-12">
+            <Heading>【デモ】実際に試してみる</Heading>
+            <p className="text-slate-600 text-lg mb-4">
+              飲食店の営業時間問い合わせボットのデモです。<br />
+              実際にメッセージを送って、自動応答を体験してください。
+            </p>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+              <Sparkles className="w-4 h-4" />
+              現在はモック版 / 本番はGPT-5 nano使用予定
+            </div>
+          </div>
+          
+          <ChatDemo />
+
+          <div className="mt-8 text-center text-slate-500 text-sm space-y-2">
+            <p>💡 試してみよう: 「営業時間を教えて」「今日は営業していますか？」「予約したいです」</p>
+            <p className="text-xs">※ このデモはモック版です。本番環境ではGPT-5 nanoを使用して、より自然で柔軟な応答が可能になります。</p>
+          </div>
+        </Section>
+      )}
+
+      {/* 5. Package Content */}
       <Section className="bg-white">
         <div className="text-center mb-16">
           <Heading>提供内容：問い合わせ対応自動化パック</Heading>
@@ -264,165 +455,7 @@ export default function App() {
         </div>
       </Section>
 
-      {/* 自動診断（選択式） */}
-      <Section className="bg-indigo-900 text-white">
-        <div className="max-w-3xl mx-auto">
-          <Heading className="text-white">【自動診断】今の対応を分析してみる</Heading>
-          <p className="text-center mb-8 text-indigo-100">
-            当てはまるものを選んで「診断する」を押してください。<br />
-            どのパックが合うか、無料でアドバイスします。
-          </p>
-          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20">
-            {!diagnosticResult ? (
-              <>
-                {/* 問い合わせの種類 */}
-                <div className="mb-6">
-                  <p className="text-indigo-200 font-bold mb-3">お客様からよくある問い合わせ（複数可）</p>
-                  <div className="flex flex-wrap gap-2">
-                    {DIAGNOSTIC_OPTIONS.inquiryTypes.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => toggleInquiryType(opt.id)}
-                        className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                          selectedInquiryTypes.includes(opt.id)
-                            ? 'bg-white text-indigo-900'
-                            : 'bg-white/10 text-indigo-100 border border-white/20 hover:bg-white/20'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* チャネル */}
-                <div className="mb-6">
-                  <p className="text-indigo-200 font-bold mb-3">主にどのチャネルから来ますか？（複数可）</p>
-                  <div className="flex flex-wrap gap-2">
-                    {DIAGNOSTIC_OPTIONS.channels.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => toggleChannel(opt.id)}
-                        className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                          selectedChannels.includes(opt.id)
-                            ? 'bg-white text-indigo-900'
-                            : 'bg-white/10 text-indigo-100 border border-white/20 hover:bg-white/20'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <button 
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing || !hasSelection}
-                  className="w-full py-4 bg-white text-indigo-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isAnalyzing ? "診断中..." : "診断する"}
-                </button>
-              </>
-            ) : (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                {/* 診断結果 */}
-                <div className="p-6 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/20 rounded-2xl backdrop-blur-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-blue-400/30 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-5 h-5 text-blue-200" />
-                    </div>
-                    <div className="flex-1">
-                      <h5 className="font-bold text-blue-200 mb-2">診断結果</h5>
-                      <p className="text-indigo-50 leading-relaxed">{diagnosticResult.aiMessage}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {diagnosticResult.analysis && (
-                  <div className="p-6 bg-white/5 border border-white/10 rounded-2xl">
-                    <h5 className="font-bold text-blue-300 mb-3 flex items-center gap-2">
-                      <Zap className="w-4 h-4" /> 詳細分析
-                    </h5>
-                    <p className="text-indigo-50 leading-relaxed">{diagnosticResult.analysis}</p>
-                  </div>
-                )}
-
-                {diagnosticResult.patterns && diagnosticResult.patterns.length > 0 && (
-                  <div className="space-y-4">
-                    <h5 className="font-bold text-blue-300 text-lg flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5" /> おすすめの提携パターン
-                    </h5>
-                    <div className="grid gap-4">
-                      {diagnosticResult.patterns.map((pattern, idx) => (
-                        <div 
-                          key={pattern.id}
-                          className={`p-6 rounded-2xl border-2 transition-all ${
-                            idx === 0 
-                              ? 'bg-blue-500/20 border-blue-400/50 shadow-lg shadow-blue-500/20' 
-                              : 'bg-white/5 border-white/10'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h6 className="font-bold text-lg text-white">{pattern.name}</h6>
-                                {idx === 0 && (
-                                  <span className="px-2 py-1 bg-blue-400 text-blue-900 text-xs font-bold rounded-full">
-                                    最適
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-indigo-100 text-sm mb-3">{pattern.description}</p>
-                              {pattern.suitability > 0 && (
-                                <div className="mb-3">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs text-indigo-200">適合度</span>
-                                    <span className="text-sm font-bold text-blue-300">{pattern.suitability}%</span>
-                                  </div>
-                                  <div className="w-full bg-white/10 rounded-full h-2">
-                                    <div 
-                                      className="bg-blue-400 h-2 rounded-full transition-all duration-500"
-                                      style={{ width: `${pattern.suitability}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            {pattern.priceRange && (
-                              <div className="text-right ml-4">
-                                <div className="text-xs text-indigo-200 mb-1">価格目安</div>
-                                <div className="text-lg font-bold text-blue-300">{pattern.priceRange}</div>
-                              </div>
-                            )}
-                          </div>
-                          <ul className="space-y-2 mt-4">
-                            {pattern.features.map((feature, featureIdx) => (
-                              <li key={featureIdx} className="flex items-start gap-2 text-sm text-indigo-100">
-                                <CheckCircle2 className="w-4 h-4 text-blue-300 flex-shrink-0 mt-0.5" />
-                                <span>{feature}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="w-full py-3 border-2 border-white/30 text-indigo-100 font-bold rounded-xl hover:bg-white/10 transition-colors"
-                >
-                  診断をやり直す
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </Section>
-
-      {/* 5. Targets */}
+      {/* 6. Targets */}
       <Section className="bg-slate-50">
         <div className="grid md:grid-cols-2 gap-12">
           <div>
@@ -460,7 +493,7 @@ export default function App() {
         </div>
       </Section>
 
-      {/* 6. Steps */}
+      {/* 7. Steps */}
       <Section className="bg-white">
         <Heading>導入までの流れ</Heading>
         <div className="relative mt-16">
@@ -485,7 +518,7 @@ export default function App() {
         </div>
       </Section>
 
-      {/* 7. Profile */}
+      {/* 8. Profile */}
       <Section className="bg-slate-900 text-white rounded-t-[4rem]">
         <div className="flex flex-col md:flex-row items-center gap-12">
           <div className="w-48 h-48 md:w-64 md:h-64 bg-slate-800 rounded-3xl overflow-hidden shadow-2xl transform rotate-3 relative border-4 border-slate-700 flex-shrink-0">
@@ -494,7 +527,6 @@ export default function App() {
               alt="対応する人" 
               className="w-full h-full object-cover object-top"
               onError={(e) => {
-                // 画像が読み込めない場合、プレースホルダーを表示
                 const target = e.target as HTMLImageElement;
                 target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuaXoOWbvueJhzwvdGV4dD48L3N2Zz4=';
               }}
@@ -525,29 +557,39 @@ export default function App() {
         </div>
       </Section>
 
-      {/* 8. Final CTA */}
+      {/* 9. Final CTA */}
       <Section className="bg-blue-600 text-white text-center">
-        <Heading className="text-white mb-6">まずは“今の状態”を教えてください</Heading>
+        <Heading className="text-white mb-6">まずは"今の状態"を教えてください</Heading>
         <p className="mb-12 text-blue-100 text-lg">
           相談は無料、チャットのみで完結します。<br />
           強引な営業もありません。お気軽にご連絡ください。
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button 
+            onClick={scrollToDemo}
+            className="px-10 py-5 bg-blue-700 text-white font-bold text-xl rounded-full border-2 border-white/20 hover:bg-blue-800 transition-all flex items-center justify-center gap-2"
+          >
+            <Sparkles className="w-6 h-6" />
+            まずはデモを試す
+          </button>
           <button className="px-10 py-5 bg-blue-700 text-white font-bold text-xl rounded-full border-2 border-white/20 hover:bg-blue-800 transition-all flex items-center justify-center gap-2">
             無料相談（チャット完結） <ArrowRight className="w-6 h-6" />
           </button>
-          <button className="px-10 py-5 bg-blue-700 text-white font-bold text-xl rounded-full border-2 border-white/20 hover:bg-blue-800 transition-all flex items-center justify-center gap-2">
-            お見積もりはこちら
-          </button>
         </div>
-        <p className="mt-4 text-blue-200 text-sm">
-          ※返信例やよく来る質問を送っていただくと、より正確なお見積もりが可能です。
-        </p>
       </Section>
 
       <footer className="py-8 text-center text-slate-400 text-sm bg-slate-950 border-t border-slate-900">
         &copy; {new Date().getFullYear()} 問い合わせ対応自動化パック. All rights reserved.
       </footer>
+
+      <style>{`
+        .delay-100 {
+          animation-delay: 0.1s;
+        }
+        .delay-200 {
+          animation-delay: 0.2s;
+        }
+      `}</style>
     </div>
   );
 }
